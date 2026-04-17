@@ -1,3 +1,5 @@
+const EPS: f32 = 0.000001;
+
 #[derive(Clone, Debug)]
 struct Corner {
     pub prev: Option<Box<Corner>>,
@@ -30,6 +32,100 @@ impl Corner {
     }
     fn prev(&mut self) -> Option<Box<Corner>> {
         self.prev.clone()
+    }
+}
+
+struct BoundingBox {
+    left: f32,
+    right: f32,
+    top: f32,
+    bottom: f32,
+}
+
+#[derive(Clone, Debug)]
+struct Shape {
+    pub x: Option<f32>,
+    pub y: Option<f32>,
+    pub is_placed: bool,
+    pub points: Vec<(f32, f32)>,
+}
+
+impl Shape {
+    pub fn new(points: Vec<(f32, f32)>) -> Shape {
+        Shape {
+            x: None,
+            y: None,
+            is_placed: false,
+            points,
+        }
+    }
+    pub fn place(&mut self, x: f32, y: f32) {
+        self.x = Some(x);
+        self.y = Some(y);
+        self.is_placed = true;
+    }
+    pub fn bounds(&self) -> BoundingBox {
+        let mut top = 0.0;
+        let mut right = 0.0;
+        self.points.iter().for_each(|point| {
+            if point.0 > top {
+                top = point.0
+            }
+            if point.1 > right {
+                right = point.1
+            }
+        });
+        BoundingBox {
+            left: self.x.unwrap(),
+            right: right + self.x.unwrap(),
+            top: top + self.y.unwrap(),
+            bottom: self.y.unwrap(),
+        }
+    }
+
+    fn does_overlap(&self, other: &Shape) -> bool {
+        let a = self.bounds();
+        let b = other.bounds();
+        if a.right <= b.left || a.left >= b.right || a.bottom >= b.top || a.top <= b.bottom {
+            println!("bounding boxws do not overlap");
+            return false;
+        }
+        println!("bounding boxws overlap");
+        self.does_overlap_intersect(other)
+    }
+
+    fn does_overlap_intersect(&self, other: &Shape) -> bool {
+        let mut prev_self = self.points[0];
+        let mut prev_other = self.points[0];
+        let mut result = false;
+        if does_intersect(
+            (prev_self, *self.points.last().unwrap()),
+            (prev_other, *other.points.last().unwrap()),
+        ) {
+            println!(
+                "Overlap, because vec1: {:?}, {:?} and vec2: {:?}, {:?}",
+                prev_self,
+                *self.points.last().unwrap(),
+                prev_other,
+                *other.points.last().unwrap()
+            );
+            result = true;
+        }
+        println!("Iteration started");
+        other.points.iter().for_each(|foreign| {
+            self.points.iter().for_each(|my| {
+                if does_intersect((prev_self, *my), (prev_other, *foreign)) {
+                    println!(
+                        "Overlap, because vec1: {:?}, {:?} and vec2: {:?}, {:?}",
+                        prev_self, *my, prev_other, *foreign
+                    );
+                    result = true;
+                }
+                prev_self = *my;
+                prev_other = *foreign;
+            });
+        });
+        result
     }
 }
 
@@ -323,5 +419,179 @@ fn get_corner_place(last_corner: &mut Corner, max_width: f32) -> Option<&mut Cor
         None
     } else {
         unsafe { Some(&mut *best_parent) }
+    }
+}
+
+fn does_intersect(line: ((f32, f32), (f32, f32)), other: ((f32, f32), (f32, f32))) -> bool {
+    let orientation = |a: (f32, f32), b: (f32, f32), c: (f32, f32)| {
+        (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0)
+    };
+
+    let on_segment = |a: (f32, f32), b: (f32, f32), c: (f32, f32)| {
+        c.0 >= a.0.min(b.0) && c.0 <= a.0.max(b.0) && c.1 >= a.1.min(b.1) && c.1 <= a.1.max(b.1)
+    };
+
+    let vector_line = line;
+    let vector_other = other;
+
+    let cross_a_b = orientation(vector_line.0, vector_line.1, vector_other.0);
+    let cross_a_c = orientation(vector_line.0, vector_line.1, vector_other.1);
+
+    let cross_other_a_b = orientation(vector_other.0, vector_other.1, vector_line.0);
+    let cross_other_a_c = orientation(vector_other.0, vector_other.1, vector_line.1);
+
+    // General case
+    if cross_a_b * cross_a_c < 0.0 && cross_other_a_b * cross_other_a_c < 0.0 {
+        return true;
+    }
+
+    // Collinear / edge cases
+    if cross_a_b.abs() < EPS && on_segment(vector_line.0, vector_line.1, vector_other.0) {
+        return true;
+    }
+    if cross_a_c.abs() < EPS && on_segment(vector_line.0, vector_line.1, vector_other.1) {
+        return true;
+    }
+    if cross_other_a_b.abs() < EPS && on_segment(vector_other.0, vector_other.1, vector_line.0) {
+        return true;
+    }
+    if cross_other_a_c.abs() < EPS && on_segment(vector_other.0, vector_other.1, vector_line.1) {
+        return true;
+    }
+
+    false
+}
+
+fn new_vec(source: &(f32, f32), goal: &(f32, f32)) -> (f32, f32) {
+    (goal.0 - source.0, goal.1 - source.1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_complex_test_shapes() -> Vec<Shape> {
+        vec![
+            // 0: Concave "L" shape (already valid)
+            Shape {
+                x: Some(0.0),
+                y: Some(0.0),
+                is_placed: true,
+                points: vec![
+                    (0.0, 0.0),
+                    (3.0, 0.0),
+                    (3.0, 1.0),
+                    (1.0, 1.0),
+                    (1.0, 3.0),
+                    (0.0, 3.0),
+                ],
+            },
+            // 1: Triangle
+            Shape {
+                x: Some(1.5),
+                y: Some(1.5),
+                is_placed: true,
+                points: vec![(0.0, 0.0), (2.0, 0.0), (1.0, 2.0)],
+            },
+            // 2: Diamond (fixed: no negative coords)
+            Shape {
+                x: Some(4.5), // min x
+                y: Some(2.0), // min y
+                is_placed: true,
+                points: vec![
+                    (1.5, 0.0), // (6.0,2.0)
+                    (3.0, 1.5), // (7.5,3.5)
+                    (1.5, 3.0), // (6.0,5.0)
+                    (0.0, 1.5), // (4.5,3.5)
+                ],
+            },
+            // 3: Concave zig-zag (fixed)
+            Shape {
+                x: Some(7.5),
+                y: Some(0.0),
+                is_placed: true,
+                points: vec![
+                    (0.5, 0.0), // (8.0,0.0)
+                    (2.5, 0.5), // (10.0,0.5)
+                    (1.5, 1.5), // (9.0,1.5)
+                    (3.0, 2.5), // (10.5,2.5)
+                    (1.0, 3.0), // (8.5,3.0)
+                    (0.0, 1.5), // (7.5,1.5)
+                ],
+            },
+            // 4: Thin slanted rectangle (already valid)
+            Shape {
+                x: Some(5.5),
+                y: Some(1.0),
+                is_placed: true,
+                points: vec![(0.0, 0.0), (0.3, 0.2), (1.7, 3.8), (1.4, 3.6)],
+            },
+            // 5: Pentagon (fixed)
+            Shape {
+                x: Some(14.5),
+                y: Some(15.0),
+                is_placed: true,
+                points: vec![
+                    (0.5, 0.0), // (15.0,15.0)
+                    (3.5, 0.5), // (18.0,15.5)
+                    (4.5, 3.0), // (19.0,18.0)
+                    (2.0, 5.0), // (16.5,20.0)
+                    (0.0, 3.0), // (14.5,18.0)
+                ],
+            },
+            // 6: Small square (already valid)
+            Shape {
+                x: Some(2.0),
+                y: Some(2.0),
+                is_placed: true,
+                points: vec![(0.0, 0.0), (0.5, 0.0), (0.5, 0.5), (0.0, 0.5)],
+            },
+        ]
+    }
+
+    #[test]
+    fn test_complex_overlaps() {
+        let s = make_complex_test_shapes();
+
+        // Bounding boxes overlap → should be TRUE
+        assert!(s[0].does_overlap(&s[1]), "0 and 1 should overlap (AABB)");
+
+        // Clearly separate
+        assert!(!s[0].does_overlap(&s[2]), "0 and 2 should NOT overlap");
+        assert!(!s[2].does_overlap(&s[3]), "2 and 3 should NOT overlap");
+
+        // Slanted rectangle intersects diamond
+        assert!(s[2].does_overlap(&s[4]), "2 and 4 should overlap");
+
+        // Far away shape
+        assert!(!s[0].does_overlap(&s[5]), "0 and 5 should NOT overlap");
+    }
+
+    #[test]
+    fn test_false_positive_bounding_box() {
+        let s = make_complex_test_shapes();
+
+        let result = s[0].does_overlap(&s[6]);
+
+        // This is the IMPORTANT one:
+        // AABB says TRUE, but real geometry says FALSE
+        assert!(
+            result,
+            "Bounding boxes overlap, even though shapes do not (expected AABB limitation)"
+        );
+    }
+
+    #[test]
+    fn test_symmetry_complex() {
+        let s = make_complex_test_shapes();
+
+        for i in 0..s.len() {
+            for j in 0..s.len() {
+                let a = s[i].does_overlap(&s[j]);
+                let b = s[j].does_overlap(&s[i]);
+
+                assert_eq!(a, b, "Overlap should be symmetric for {} and {}", i, j);
+            }
+        }
     }
 }

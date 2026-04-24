@@ -120,6 +120,7 @@ impl Shape {
             prev = Some(Box::new(corn));
         });
         next.set_prev_box_opt(prev);
+        //println!("next: {:?}", next);
     }
 
     fn does_overlap_intersect(&self, other: &Shape) -> bool {
@@ -493,12 +494,12 @@ fn fit(width: f32, shapes: &mut Vec<Shape>) {
             let (mut width, mut height) = match next_corner.clone().prev().unwrap().prev() {
                 Some(prev) => {
                     let width = if next_corner.x.min(prev.x) - curr.x < EPSILON {
-                        prev.x - curr.x
+                        next_corner.x.max(prev.x) - curr.x
                     } else {
                         next_corner.x.min(prev.x) - curr.x
                     };
                     let height = if next_corner.y.min(prev.y) - curr.y < EPSILON {
-                        prev.y - curr.y
+                        next_corner.y.min(prev.y) - curr.y
                     } else {
                         next_corner.y.min(prev.y) - curr.y
                     };

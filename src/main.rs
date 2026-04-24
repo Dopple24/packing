@@ -22,7 +22,7 @@ impl Corner {
     }
     fn clean_up(&mut self, shapes: &Vec<Shape>) {
         let mut curr: Box<Corner> = Box::new(self.clone());
-        println!("clean_up beggining {:?}", curr);
+        //println!("clean_up beggining {:?}", curr);
         let mut next: Option<Corner> = None;
         while curr.prev.is_some() {
             let prev = curr.prev.clone().unwrap();
@@ -40,7 +40,7 @@ impl Corner {
             }
             curr = curr.prev.clone().unwrap();
         }
-        println!("clean up ended {:?}", curr);
+        //println!("clean up ended {:?}", curr);
     }
     fn prev(&mut self) -> Option<Box<Corner>> {
         self.prev.clone()
@@ -85,11 +85,11 @@ impl Shape {
         let mut top = 0.0;
         let mut right = 0.0;
         self.points.iter().for_each(|point| {
-            if point.0 > top {
-                top = point.0
+            if point.1 > top {
+                top = point.1
             }
-            if point.1 > right {
-                right = point.1
+            if point.0 > right {
+                right = point.0
             }
         });
         BoundingBox {
@@ -104,15 +104,15 @@ impl Shape {
         let a = self.bounds();
         let b = other.bounds();
         if a.right <= b.left || a.left >= b.right || a.bottom >= b.top || a.top <= b.bottom {
-            println!("bounding boxws do not overlap");
+            //println!("bounding boxws do not overlap");
             return false;
         }
-        println!("bounding boxws overlap");
+        //println!("bounding boxws overlap");
         self.does_overlap_intersect(other)
     }
 
     fn get_corners(&self, next: &mut Corner, prev: Option<Box<Corner>>) {
-        println!("next: {:?}, prev: {:?}", next, prev);
+        //println!("next: {:?}, prev: {:?}", next, prev);
         let mut prev = prev;
         self.points.iter().for_each(|(x, y)| {
             let mut corn = Corner::new(*x + self.x.unwrap(), *y + self.y.unwrap());
@@ -123,27 +123,28 @@ impl Shape {
     }
 
     fn does_overlap_intersect(&self, other: &Shape) -> bool {
-        let mut prev_self = self.points[0];
-        let mut prev_other = self.points[0];
+        let mut prev_self = *self.points.last().unwrap();
+        let mut prev_other = *self.points.last().unwrap();
         let mut result = false;
         if does_intersect(
             (prev_self, *self.points.last().unwrap()),
             (prev_other, *other.points.last().unwrap()),
         ) {
-            println!(
+            /*//println!(
                 "Overlap, because vec1: {:?}, {:?} and vec2: {:?}, {:?}",
                 prev_self,
                 *self.points.last().unwrap(),
                 prev_other,
                 *other.points.last().unwrap()
-            );
+            );*/
             result = true;
         }
         other.points.iter().for_each(|point| {
-            if self
-                .contains_point_strict(((*point).0 + self.x.unwrap(), (*point).1 + self.y.unwrap()))
-            {
-                println!("self contains this point: {:?}", point);
+            if self.contains_point_strict((
+                (*point).0 + other.x.unwrap(),
+                (*point).1 + other.y.unwrap(),
+            )) {
+                //println!("self contains this point: {:?}, self: {:?}", point, self);
                 result = true;
             }
         });
@@ -154,7 +155,7 @@ impl Shape {
             if other
                 .contains_point_strict(((*point).0 + self.x.unwrap(), (*point).1 + self.y.unwrap()))
             {
-                println!("other contains this point: {:?}", point);
+                //println!("other contains this point: {:?}, other: {:?}", point, other);
                 result = true;
             }
         });
@@ -165,10 +166,10 @@ impl Shape {
         other.points.iter().for_each(|foreign| {
             let mut has_same = false;
             self.points.iter().for_each(|my| {
-                println!(
-                    "points compared: {:?}, {:?} and {:?}, {:?}",
-                    prev_self, *my, prev_other, *foreign
-                );
+                /*//println!(
+                    "points compared: {:?}, {:?} from shape: {:?} and {:?}, {:?} from shape: {:?}",
+                    prev_self, *my, self, prev_other, *foreign, other,
+                );*/
                 if my.0 + self.x.unwrap() == foreign.0 + other.x.unwrap()
                     && my.1 + self.y.unwrap() == foreign.1 + other.y.unwrap()
                 {
@@ -192,7 +193,7 @@ impl Shape {
                 ) {
                     result = true;
                 }
-                println!("result: {result}");
+                //println!("result: {result}");
                 prev_self = *my;
             });
             if !has_same {
@@ -200,7 +201,7 @@ impl Shape {
             }
             prev_other = *foreign;
         });
-        println!("is_exactly_same: {is_exactly_same}");
+        //println!("is_exactly_same: {is_exactly_same}");
         result || is_exactly_same
     }
 
@@ -227,11 +228,17 @@ impl Shape {
         let mut inside = false;
 
         for i in 0..n {
-            let (x1, y1) = self.points[i];
-            let (x2, y2) = self.points[(i + 1) % n];
+            let (x1, y1) = (
+                self.points[i].0 + self.x.unwrap(),
+                self.points[i].1 + self.y.unwrap(),
+            );
+            let (x2, y2) = (
+                self.points[(i + 1) % n].0 + self.x.unwrap(),
+                self.points[(i + 1) % n].1 + self.y.unwrap(),
+            );
 
-            let intersects = ((y1 > py) != (y2 > py))
-                && (px < (x2 - x1) * (py - y1) / (y2 - y1 + f32::EPSILON) + x1);
+            let intersects =
+                ((y1 > py) != (y2 > py)) && (px < (x2 - x1) * (py - y1) / (y2 - y1) + x1);
 
             if intersects {
                 inside = !inside;
@@ -440,10 +447,10 @@ fn fit(width: f32, shapes: &mut Vec<Shape>) {
             None => break,
         };
 
-        println!(
+        /*//println!(
             "-----------current best corner's parent is-----------\n{:?}",
             next_corner
-        );
+        );*/
 
         let placed: Vec<Shape> = shapes
             .clone()
@@ -458,17 +465,17 @@ fn fit(width: f32, shapes: &mut Vec<Shape>) {
             break;
         }
 
-        println!("placed: {:?}", placed);
+        println!("{:?}", placed);
 
         let mut is_shape_placed: bool = false;
 
         for shape in filtered.iter_mut() {
-            println!("trying to place: {:?} at {:?}", shape, next_corner);
+            //println!("trying to place: {:?} at {:?}", shape, next_corner);
             shape.place(next_corner.prev().unwrap().x, next_corner.prev().unwrap().y);
             let mut does_overlap = false;
             for s in placed.iter() {
                 if shape.does_overlap(s) {
-                    println!("overlaped");
+                    //println!("overlaped");
                     shape.remove();
                     does_overlap = true;
                     break;
@@ -476,7 +483,7 @@ fn fit(width: f32, shapes: &mut Vec<Shape>) {
             }
             if !does_overlap {
                 is_shape_placed = true;
-                println!("doesn't overlap");
+                //println!("doesn't overlap");
                 shape.get_corners(next_corner, next_corner.clone().prev().unwrap().prev());
                 break;
             }
@@ -542,7 +549,7 @@ fn fit(width: f32, shapes: &mut Vec<Shape>) {
                 next_corner.set_prev(rig);
             }
             filtered.push(&mut virt);
-            println!("creating virtual rectangle {:?}", virt);
+            //println!("creating virtual rectangle {:?}", virt);
         }
     }
 }
@@ -622,9 +629,9 @@ fn does_intersect(line: ((f32, f32), (f32, f32)), other: ((f32, f32), (f32, f32)
     let cross_other_a_b = orientation(vector_other.0, vector_other.1, vector_line.0);
     let cross_other_a_c = orientation(vector_other.0, vector_other.1, vector_line.1);
 
-    /*println!("vectors: {:?}, {:?}", vector_line, vector_other);
+    /*//println!("vectors: {:?}, {:?}", vector_line, vector_other);
 
-    println!(
+    //println!(
         "cross_a_b: {:?}, cross_a_c: {:?}, cross_other_a_b: {:?}, cross_other_a_c: {:?}",
         cross_a_b, cross_a_c, cross_other_a_b, cross_other_a_c
     );*/
@@ -756,6 +763,25 @@ mod tests {
                 is_placed: true,
                 points: vec![(0.0, 0.0), (0.5, 0.0), (0.5, 0.5), (0.0, 0.5)],
             },
+            //7
+            Shape {
+                x: Some(3.5),
+                y: Some(0.0),
+                is_placed: true,
+                points: vec![(0.0, 0.0), (0.3, 0.2), (1.7, 3.8), (1.4, 3.6)],
+            },
+            //8
+            Shape {
+                x: Some(3.5), // min x
+                y: Some(3.0), // min y
+                is_placed: true,
+                points: vec![
+                    (1.5, 0.0), // (6.0,2.0)
+                    (3.0, 1.5), // (7.5,3.5)
+                    (1.5, 3.0), // (6.0,5.0)
+                    (0.0, 1.5), // (4.5,3.5)
+                ],
+            },
         ]
     }
 
@@ -763,8 +789,10 @@ mod tests {
     fn test_complex_overlaps() {
         let s = make_complex_test_shapes();
 
-        // Bounding boxes overlap → should be TRUE
-        assert!(s[0].does_overlap(&s[1]), "0 and 1 should overlap (AABB)");
+        assert!(
+            !s[0].does_overlap(&s[1]),
+            "0 and 1 should NOT overlap (AABB)"
+        );
 
         // Clearly separate
         assert!(!s[0].does_overlap(&s[2]), "0 and 2 should NOT overlap");
@@ -775,6 +803,9 @@ mod tests {
 
         // Far away shape
         assert!(!s[0].does_overlap(&s[5]), "0 and 5 should NOT overlap");
+
+        //println!("printing 7, 8");
+        assert!(s[7].does_overlap(&s[8]), "7 and 8 should overlap");
     }
 
     #[test]
@@ -786,7 +817,7 @@ mod tests {
         // This is the IMPORTANT one:
         // AABB says TRUE, but real geometry says FALSE
         assert!(
-            result,
+            !result,
             "Bounding boxes overlap, even though shapes do not (expected AABB limitation)"
         );
     }
@@ -794,6 +825,8 @@ mod tests {
     #[test]
     fn test_symmetry_complex() {
         let s = make_complex_test_shapes();
+
+        assert_eq!(s[0].does_overlap(&s[1]), s[1].does_overlap(&s[0]));
 
         for i in 0..s.len() {
             for j in 0..s.len() {
@@ -850,8 +883,8 @@ mod tests {
         curr.set_prev(Corner::new(0.0, 0.0));
         let mut next = Corner::new(10.0, 10.0);
         let mut prev = shapes[0].get_corners(&mut next, curr.prev.unwrap());
-        println!("shape: {:?}", shapes[0]);
-        println!("{:?}", prev);
+        //println!("shape: {:?}", shapes[0]);
+        //println!("{:?}", prev);
         assert!(false);
     }*/
 }
